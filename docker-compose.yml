@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Base de données MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: brvm_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-brvm_db}
+      MYSQL_USER: ${MYSQL_USER:-brvm_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-brvm_password}
+    ports:
+      - "3307:3306"  # Changé de 3306:3306 à 3307:3306 pour éviter conflit avec MySQL hôte
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - brvm_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Application FastAPI
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: brvm_api
+    restart: unless-stopped
+    environment:
+      # Seule cette variable est utilisée par l'application
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-brvm_user}:${MYSQL_PASSWORD:-brvm_password}@mysql:3306/${MYSQL_DATABASE:-brvm_db}
+      DEBUG: ${DEBUG:-False}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TIMEZONE: ${TIMEZONE:-Africa/Abidjan}
+      SCRAPER_INTERVAL_MINUTES: ${SCRAPER_INTERVAL_MINUTES:-30}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - brvm_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  brvm_network:
+    driver: bridge
