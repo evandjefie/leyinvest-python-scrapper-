@@ -33,12 +33,15 @@ COPY . .
 RUN mkdir -p downloads logs && \
     chmod 777 downloads logs
 
+RUN adduser -D nonroot
+USER nonroot
+
 # Exposer le port
 EXPOSE 8000
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f https://api.leyinvest.com/health || exit 1
 
 # Commande de démarrage
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
