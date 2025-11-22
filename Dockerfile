@@ -33,7 +33,8 @@ COPY . .
 RUN mkdir -p downloads logs && \
     chmod 777 downloads logs
 
-RUN adduser -D nonroot
+# Créer l'utilisateur nonroot sans répertoire personnel
+RUN useradd --no-create-home nonroot
 USER nonroot
 
 # Exposer le port
